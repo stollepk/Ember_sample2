@@ -1,0 +1,76 @@
+import Component from '@ember/component';
+import { computed } from '@ember/object';
+
+export const STAR_FILTERS = [
+  {
+    type: 'below',
+    value: 100,
+  },
+  {
+    type: 'between',
+    min: 100,
+    max: 1000,
+  },
+  { type: 'above', value: 1000 },
+];
+
+export const STAR_FILTER_NAMES = STAR_FILTERS.map(filter => {
+  if (filter.type === 'between') {
+    return `between ${filter.min} and ${filter.max}`;
+  }
+  return `${filter.type} ${filter.value}`;
+});
+
+export default Component.extend({
+  classNames: ['repo-list'],
+  languageFilter: 'all',
+  privacyFilter: 'all',
+  starsFilter: 'all',
+  init() {
+    this._super(...arguments);
+    this.privacyOptions = ['all', 'private', 'public'];
+
+    this.starsOptions = ['all', ...STAR_FILTER_NAMES];
+  },
+  languageOptions: computed('repos.[]', {
+    get() {
+      return [
+        'all',
+        ...this.get('repos')
+          .uniqBy('language')
+          .mapBy('language'),
+      ];
+    },
+  }),
+
+  filteredRepos: computed('repos.[]', 'languageFilter', 'privacyFilter', 'starsFilter', {
+    get() {
+      return this.repos.filter(repo => {
+        const repoPrivacy = repo.private ? 'private' : 'public';
+        const isMatchingPrivacy = this.privacyFilter === 'all' || this.privacyFilter === repoPrivacy;
+        const isMatchingLanguage = this.languageFilter === 'all' || this.languageFilter === repo.language;
+        return isMatchingPrivacy && isMatchingLanguage && hasEnoughStars(repo, this.starsFilter);
+      });
+    },
+  }),
+});
+
+function hasEnoughStars(repo, starsFilter) {
+  const selectedFilterIndex = STAR_FILTER_NAMES.indexOf(starsFilter);
+
+  if (selectedFilterIndex > -1) {
+    const selectedFilter = STAR_FILTERS[selectedFilterIndex];
+    switch (selectedFilter.type) {
+      case 'below':
+        return repo.stargazers_count < selectedFilter.value;
+      case 'between':
+        return repo.stargazers_count >= selectedFilter.min && repo.stargazers_count <= selectedFilter.max;
+      case 'above':
+        return repo.stargazers_count > selectedFilter.value;
+      default:
+        return true;
+    }
+  }
+  return true;
+}
+
